@@ -121,9 +121,12 @@ function flash(cls) {
 // ---------- QR 처리 ----------
 function onScan(text) {
   text = String(text).trim();
+  // 마지막으로 "보인" 시각을 매 프레임 갱신 → QR을 화면에 계속 대고 있으면 다시 인식하지 않고,
+  // 화면에서 1.5초 이상 사라졌다가 다시 보여야 +1
   const now = Date.now();
-  if (now - (lastScanAt.get(text) || 0) < COOLDOWN_MS) return;
+  const lastSeen = lastScanAt.get(text) || 0;
   lastScanAt.set(text, now);
+  if (now - lastSeen < COOLDOWN_MS) return;
 
   const amt = text.match(AMOUNT_RE);
   if (amt && Number(amt[1]) > 0) {
