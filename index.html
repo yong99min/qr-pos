@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR 계산대</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">QR 계산대</a>
+    <nav>
+      <a href="sales.html">판매 내역</a>
+      <a href="admin.html">상품 관리</a>
+      <a href="amount-qr.html">금액 QR 인쇄</a>
+      <a href="#" id="phoneLink">📱 폰으로 열기</a>
+    </nav>
+  </header>
+
+  <main class="pos">
+    <section class="camera-panel" id="cameraPanel">
+      <div id="reader"></div>
+      <div class="guide"></div>
+      <div class="scan-hint">QR 코드를 네모 안에 비춰주세요</div>
+      <button class="switch-cam" id="switchCamBtn">📷 후면 카메라로</button>
+      <div class="camera-msg hidden" id="cameraMsg"></div>
+    </section>
+
+    <aside class="cart-panel">
+      <h2>장바구니</h2>
+      <ul class="cart-list" id="cartList"></ul>
+      <div class="cart-empty" id="cartEmpty">상품 QR을 찍어주세요</div>
+      <div class="cart-footer">
+        <div class="row"><span>총 수량</span><b id="totalQty">0개</b></div>
+        <div class="total"><span>합계</span><b id="totalAmt">0원</b></div>
+        <button class="btn-pay" id="payBtn" disabled>결제 완료</button>
+        <button class="btn-reset" id="resetBtn">초기화</button>
+      </div>
+    </aside>
+  </main>
+
+  <div class="modal hidden" id="phoneModal">
+    <div class="modal-box">
+      <h3>📱 폰 카메라로 이 QR을 찍으세요</h3>
+      <div class="phone-qr" id="phoneQr"></div>
+      <div class="phone-url" id="phoneUrl"></div>
+      <p class="phone-warn hidden" id="phoneWarn">
+        지금은 PC 전용 주소(localhost 또는 http)로 열려 있어서 폰에서는 열리지 않아요.<br>
+        README의 <b>폰으로 접속하기</b>대로 HTTPS 서버를 켜고, PC에서도 <b>https://PC의IP:8443</b> 주소로 연 다음 다시 눌러주세요.
+      </p>
+      <button class="btn primary" data-close>닫기</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="common.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

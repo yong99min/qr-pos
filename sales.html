@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>판매 내역 · QR 계산대</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html">QR 계산대</a>
+    <nav>
+      <a href="index.html">계산대</a>
+      <a href="sales.html" class="active">판매 내역</a>
+      <a href="admin.html">상품 관리</a>
+      <a href="amount-qr.html">금액 QR 인쇄</a>
+    </nav>
+  </header>
+
+  <div class="page">
+    <h1>판매 내역</h1>
+
+    <div class="stats">
+      <div class="stat today"><div class="label">오늘 총 판매액</div><div class="value" id="todayTotal">0원</div></div>
+      <div class="stat"><div class="label">전체 총 판매액</div><div class="value" id="allTotal">0원</div></div>
+      <div class="stat"><div class="label">결제 건수</div><div class="value" id="count">0건</div></div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn primary" id="csvBtn">CSV로 내보내기</button>
+      <button class="btn danger" id="clearBtn">전체 삭제</button>
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="list">결제 목록</button>
+      <button data-tab="daily">날짜별 합계</button>
+    </div>
+
+    <table class="data" id="listTable">
+      <thead><tr><th>날짜·시간</th><th class="num">최종 금액</th><th></th></tr></thead>
+      <tbody id="listRows"></tbody>
+    </table>
+
+    <table class="data hidden" id="dailyTable">
+      <thead><tr><th>날짜</th><th class="num">결제 건수</th><th class="num">합계</th></tr></thead>
+      <tbody id="dailyRows"></tbody>
+    </table>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let sales = [];
+
+    function sorted() {
+      return [...sales].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+    }
+
+    function dailyTotals() {
+      const map = new Map();
+      sorted().forEach((s) => {
+        const k = dateKey(new Date(s.ts));
+        const d = map.get(k) || { date: k, count: 0, total: 0 };
+        d.count += 1;
+        d.total += s.total;
+        map.set(k, d);
+      });
+      return [...map.values()];
+    }
+
+    function render() {
+      sales = load(KEYS.sales, []);
+      const today = dateKey(new Date());
+      const todayTotal = sales.filter((s) => dateKey(new Date(s.ts)) === today).reduce((a, s) => a + s.total, 0);
+      $('todayTotal').textContent = won(todayTotal);
+      $('allTotal').textContent = won(sales.reduce((a, s) => a + s.total, 0));
+      $('count').textContent = sales.length.toLocaleString('ko-KR') + '건';
+
+      const list = sorted();
+      $('listRows').innerHTML = list.length
+        ? list.map((s) => `
+          <tr>
+            <td>${dateTimeText(new Date(s.ts))}</td>
+            <td class="num"><b>${won(s.total)}</b></td>
+            <td class="actions"><button class="btn small danger" data-del="${escapeHtml(s.id)}">삭제</button></td>
+          </tr>`).join('')
+        : '<tr class="empty-row"><td colspan="3">아직 결제 내역이 없어요</td></tr>';
+
+      const daily = dailyTotals();
+      $('dailyRows').innerHTML = daily.length
+        ? daily.map((d) => `
+          <tr>
+            <td>${d.date}${d.date === today ? ' <small style="color:var(--ok)">(오늘)</small>' : ''}</td>
+            <td class="num">${d.count}건</td>
+            <td class="num"><b>${won(d.total)}</b></td>
+          </tr>`).join('')
+        : '<tr class="empty-row"><td colspan="3">아직 결제 내역이 없어요</td></tr>';
+    }
+
+    document.querySelector('.tabs').addEventListener('click', (e) => {
+      const tab = e.target.dataset.tab;
+      if (!tab) return;
+      document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === e.target));
+      $('listTable').classList.toggle('hidden', tab !== 'list');
+      $('dailyTable').classList.toggle('hidden', tab !== 'daily');
+    });
+
+    $('listRows').addEventListener('click', (e) => {
+      const id = e.target.dataset.del;
+      if (!id) return;
+      const s = sales.find((x) => x.id === id);
+      if (!s || !confirm(`${dateTimeText(new Date(s.ts))} · ${won(s.total)} 내역을 삭제할까요?`)) return;
+      save(KEYS.sales, sales.filter((x) => x.id !== id));
+      render();
+    });
+
+    $('clearBtn').addEventListener('click', () => {
+      if (sales.length === 0) return;
+      if (!confirm(`판매 내역 ${sales.length}건을 모두 삭제할까요?\n되돌릴 수 없어요.`)) return;
+      save(KEYS.sales, []);
+      render();
+    });
+
+    $('csvBtn').addEventListener('click', () => {
+      if (sales.length === 0) return alert('내보낼 내역이 없어요.');
+      const rows = [['날짜', '시간', '최종금액']];
+      sorted().forEach((s) => {
+        const [date, time] = dateTimeText(new Date(s.ts)).split(' ');
+        rows.push([date, time, s.total]);
+      });
+      // 엑셀에서 한글이 깨지지 않도록 BOM 추가
+      const csv = '﻿' + rows.map((r) => r.join(',')).join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `판매내역_${dateKey(new Date())}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    window.addEventListener('storage', (e) => { if (e.key === KEYS.sales) render(); });
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>금액 QR 인쇄 · QR 계산대</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    /* A4(210×297mm) - 여백 8mm → 194×281mm, 4열×5행 */
+    .sheets { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px 64px; }
+    .sheet {
+      width: 194mm;
+      height: 279mm;
+      background: #fff;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      border-top: 1px dashed #888;
+      border-left: 1px dashed #888;
+      box-shadow: 0 0 0 8mm #fff, 0 4px 24px 8mm rgba(0, 0, 0, 0.12);
+      margin: 8mm 0;
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2mm;
+      border-right: 1px dashed #888;
+      border-bottom: 1px dashed #888;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      overflow: hidden;
+    }
+    .cell .qr canvas, .cell .qr img { width: 40mm; height: 40mm; display: block; }
+    .cell .amt { font-size: 20pt; font-weight: 900; letter-spacing: -0.5px; }
+    .print-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 12px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      font-size: 18px;
+    }
+    .print-bar .btn { font-size: 22px; padding: 12px 32px; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      html, body { background: #fff; height: auto; }
+      .screen-only { display: none !important; }
+      .sheets { display: block; padding: 0; gap: 0; }
+      .sheet {
+        margin: 0;
+        box-shadow: none;
+        break-after: page;
+        page-break-after: always;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .sheet:last-child { break-after: auto; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="screen-only">
+    <header class="topbar">
+      <a class="brand" href="index.html">QR 계산대</a>
+      <nav>
+        <a href="index.html">계산대</a>
+        <a href="sales.html">판매 내역</a>
+        <a href="admin.html">상품 관리</a>
+        <a href="amount-qr.html" class="active">금액 QR 인쇄</a>
+      </nav>
+    </header>
+    <div class="print-bar">
+      <span>1,000원 ~ 100,000원 · 100개 · A4 5장</span>
+      <button class="btn primary" onclick="window.print()">인쇄</button>
+    </div>
+  </div>
+
+  <div class="sheets" id="sheets"></div>
+
+  <script src="common.js"></script>
+  <script>
+    const PER_PAGE = 20;
+    const amounts = Array.from({ length: 100 }, (_, i) => (i + 1) * 1000);
+    const container = document.getElementById('sheets');
+
+    for (let page = 0; page < amounts.length / PER_PAGE; page++) {
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      amounts.slice(page * PER_PAGE, (page + 1) * PER_PAGE).forEach((amt) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const qr = document.createElement('div');
+        qr.className = 'qr';
+        new QRCode(qr, { text: 'AMT:' + amt, width: 400, height: 400, correctLevel: QRCode.CorrectLevel.M });
+        const label = document.createElement('div');
+        label.className = 'amt';
+        label.textContent = won(amt);
+        cell.append(qr, label);
+        sheet.appendChild(cell);
+      });
+      container.appendChild(sheet);
+    }
+  </script>
+</body>
+</html>
