@@ -96,20 +96,60 @@ function getAudio() {
 // 브라우저 자동재생 정책 때문에 첫 사용자 입력 때 오디오를 깨워둠
 ['pointerdown', 'keydown'].forEach((ev) => window.addEventListener(ev, getAudio, { once: true }));
 
+// sounds 폴더에 파일을 넣으면 그 소리를 쓰고, 없으면 아래 합성음을 사용
+const SOUND_FILES = { ok: 'sounds/scan.mp3', err: 'sounds/error.mp3' };
+const soundBuffers = {};
+
+async function loadSounds() {
+  const ctx = getAudio();
+  if (!ctx) return;
+  for (const [name, url] of Object.entries(SOUND_FILES)) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      soundBuffers[name] = await ctx.decodeAudioData(await res.arrayBuffer());
+    } catch (e) { /* 파일 없음 → 합성음 */ }
+  }
+}
+
+function playBuffer(ctx, buffer) {
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(ctx.destination);
+  src.start();
+}
+
+// 사각파를 짧고 평평하게 울려야 마트 바코드 스캐너 같은 "삑" 소리가 남
+function tone(ctx, freq, start, dur, volume = 0.3) {
+  const osc = ctx.createOscillator();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = freq;
+  filter.type = 'lowpass';
+  filter.frequency.value = 5000;
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(volume, start + 0.005);
+  gain.gain.setValueAtTime(volume, start + dur - 0.01);
+  gain.gain.linearRampToValueAtTime(0, start + dur);
+  osc.connect(filter).connect(gain).connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur);
+}
+
 function beep(ok = true) {
   const ctx = getAudio();
   if (!ctx) return;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = ok ? 'sine' : 'square';
-  osc.frequency.value = ok ? 1800 : 300;
+  const buffer = soundBuffers[ok ? 'ok' : 'err'];
+  if (buffer) return playBuffer(ctx, buffer);
+
   const t = ctx.currentTime;
-  const dur = ok ? 0.12 : 0.25;
-  gain.gain.setValueAtTime(0.25, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(t);
-  osc.stop(t + dur);
+  if (ok) {
+    tone(ctx, 2700, t, 0.11); // 삑
+  } else {
+    tone(ctx, 420, t, 0.14, 0.25); // 삐-빅 (낮은 경고음 두 번)
+    tone(ctx, 420, t + 0.2, 0.14, 0.25);
+  }
 }
 
 function flash(cls) {
@@ -258,5 +298,6 @@ window.addEventListener('storage', (e) => {
 (async function init() {
   renderCart();
   products = await loadProducts();
+  loadSounds();
   startCamera();
 })();

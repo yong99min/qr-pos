@@ -23,7 +23,7 @@ function save(key, value) {
 }
 
 function won(n) {
-  return Number(n || 0).toLocaleString('ko-KR') + '원';
+  return Number(n || 0).toLocaleString('ko-KR') + '달란트';
 }
 
 function escapeHtml(s) {
