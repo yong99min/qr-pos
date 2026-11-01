@@ -10,20 +10,29 @@
 <body>
   <header class="topbar">
     <a class="brand" href="index.html">QR 계산대</a>
+    <div class="mode-switch" id="modeSwitch">
+      <button data-mode="goods">🎁 물품</button>
+      <button data-mode="food">🍢 음식</button>
+    </div>
+    <span class="sync-status" id="syncStatus"></span>
     <nav>
       <a href="sales.html">판매 내역</a>
-      <a href="admin.html">상품 관리</a>
+      <a href="admin.html">상품·설정</a>
       <a href="#" id="phoneLink">📱 폰으로 열기</a>
     </nav>
   </header>
 
   <main class="pos">
-    <section class="camera-panel" id="cameraPanel">
-      <div id="reader"></div>
-      <div class="guide"></div>
-      <div class="scan-hint">QR 코드를 네모 안에 비춰주세요</div>
-      <button class="switch-cam" id="switchCamBtn">📷 후면 카메라로</button>
-      <div class="camera-msg hidden" id="cameraMsg"></div>
+    <section class="left-panel">
+      <div class="food-grid hidden" id="foodGrid"></div>
+      <section class="camera-panel" id="cameraPanel">
+        <div id="reader"></div>
+        <div class="guide"></div>
+        <div class="scan-hint" id="scanHint">QR 코드를 네모 안에 비춰주세요</div>
+        <button class="switch-cam" id="switchCamBtn">📷 후면 카메라로</button>
+        <button class="keypad-open" id="keypadOpenBtn">⌨ 금액 직접 입력</button>
+        <div class="camera-msg hidden" id="cameraMsg"></div>
+      </section>
     </section>
 
     <aside class="cart-panel">
@@ -33,11 +42,32 @@
       <div class="cart-footer">
         <div class="row"><span>총 수량</span><b id="totalQty">0개</b></div>
         <div class="total"><span>합계</span><b id="totalAmt">0달란트</b></div>
+        <div class="pay-hint hidden" id="payHint">💳 손님 QR(이름표·폰)을 카메라에 대면 결제돼요</div>
         <button class="btn-pay" id="payBtn" disabled>결제 완료</button>
         <button class="btn-reset" id="resetBtn">초기화</button>
       </div>
     </aside>
   </main>
+
+  <div class="modal hidden" id="keypadModal">
+    <div class="modal-box keypad-box">
+      <h3>금액 직접 입력</h3>
+      <div class="keypad-display"><span id="keypadValue">0</span> 달란트</div>
+      <div class="keypad" id="keypad">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button data-k="clear" class="k-sub">지움</button><button data-k="0">0</button><button data-k="back" class="k-sub">⌫</button>
+      </div>
+      <div class="keypad-actions">
+        <button class="btn" data-k="close">닫기</button>
+        <button class="btn primary" data-k="add">장바구니에 담기</button>
+      </div>
+      <p class="hint">노트북은 키보드 숫자 + Enter 로도 입력돼요</p>
+    </div>
+  </div>
+
+  <div class="pay-overlay hidden" id="payOverlay"><div class="pay-box" id="payBox"></div></div>
 
   <div class="modal hidden" id="phoneModal">
     <div class="modal-box">
@@ -53,7 +83,9 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
   <script src="common.js"></script>
+  <script src="api.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

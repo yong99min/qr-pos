@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>가격 QR 인쇄 · QR 계산대</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    /* A4 - 여백 8mm → 194×281mm, 4열×5행 = 한 장 20개 */
+    .sheet {
+      width: 194mm;
+      height: 279mm;
+      margin: 16px auto;
+      background: #fff;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(5, 1fr);
+      border-top: 1px dashed #888;
+      border-left: 1px dashed #888;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+    }
+    .cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2mm;
+      border-right: 1px dashed #888;
+      border-bottom: 1px dashed #888;
+      overflow: hidden;
+    }
+    .cell .qr img, .cell .qr canvas { width: 40mm; height: 40mm; display: block; }
+    .cell .amt { font-size: 18pt; font-weight: 900; }
+
+    .price-rows { display: flex; flex-direction: column; gap: 8px; }
+    .price-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .price-row input {
+      font: inherit;
+      font-size: 22px;
+      font-weight: 800;
+      width: 130px;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      text-align: right;
+    }
+    .price-row .unit { font-size: 18px; font-weight: 700; color: var(--muted); }
+    .qty-ctrl .qty { min-width: 48px; }
+    .price-row .sub { color: var(--muted); font-size: 15px; }
+    .quick { display: flex; gap: 6px; flex-wrap: wrap; }
+    .summary { font-size: 18px; font-weight: 800; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      html, body { background: #fff; height: auto; }
+      .screen-only { display: none !important; }
+      .sheet { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+      .sheet:last-child { break-after: auto; page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="screen-only">
+    <header class="topbar">
+      <a class="brand" href="index.html">QR 계산대</a>
+      <nav>
+        <a href="index.html">계산대</a>
+        <a href="sales.html">판매 내역</a>
+        <a href="admin.html">상품·설정</a>
+      </nav>
+    </header>
+    <div class="page">
+      <h1>🏷️ 가격 QR 인쇄</h1>
+
+      <div class="card">
+        <div class="price-rows" id="rows"></div>
+        <div class="toolbar">
+          <button class="btn" id="addRowBtn">+ 금액 추가</button>
+        </div>
+        <div class="toolbar" style="margin-bottom:0;align-items:center">
+          <span class="summary" id="summary"></span>
+          <button class="btn primary" id="printBtn">인쇄 / PDF 저장</button>
+          <button class="btn danger" id="resetBtn">전부 지우기</button>
+        </div>
+        <p class="hint">수량 버튼: [+] 1개씩, [+20] A4 한 장씩. 인쇄 창에서 대상을 "PDF로 저장"으로 바꾸면 PDF 파일로 받을 수 있어요.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="sheets"></div>
+
+  <script src="common.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const PER_PAGE = 20;
+    const STORE = 'pos_price_qr';
+    let rows = load(STORE, [{ price: 10, qty: 20 }]); // [{ price, qty }]
+
+    function persist() { save(STORE, rows); }
+
+    function renderRows() {
+      $('rows').innerHTML = rows.map((r, i) => `
+        <div class="price-row" data-i="${i}">
+          <input type="number" min="1" step="1" value="${r.price || ''}" data-price placeholder="금액">
+          <span class="unit">달란트</span>
+          <div class="qty-ctrl">
+            <button data-d="-20" class="k-sub" title="한 장 빼기" style="width:auto;padding:0 10px;font-size:18px">−20</button>
+            <button data-d="-1" aria-label="1개 빼기">−</button>
+            <span class="qty">${r.qty}</span>
+            <button data-d="1" aria-label="1개 더">+</button>
+            <button data-d="20" title="한 장 더" style="width:auto;padding:0 10px;font-size:18px">+20</button>
+          </div>
+          <span class="sub">개</span>
+          <button class="btn small danger" data-del>삭제</button>
+        </div>`).join('');
+      renderSheets();
+    }
+
+    function renderSheets() {
+      const cells = [];
+      rows.forEach((r) => {
+        if (r.price > 0) for (let n = 0; n < r.qty; n++) cells.push(r.price);
+      });
+      const pages = Math.ceil(cells.length / PER_PAGE);
+      $('summary').textContent = `총 ${cells.length}개 · A4 ${pages}장`;
+      $('printBtn').disabled = cells.length === 0;
+
+      const container = $('sheets');
+      container.innerHTML = '';
+      for (let p = 0; p < pages; p++) {
+        const sheet = document.createElement('div');
+        sheet.className = 'sheet';
+        cells.slice(p * PER_PAGE, (p + 1) * PER_PAGE).forEach((price) => {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.innerHTML = '<div class="qr"></div><div class="amt"></div>';
+          new QRCode(cell.querySelector('.qr'), { text: 'AMT:' + price, width: 400, height: 400, correctLevel: QRCode.CorrectLevel.M });
+          cell.querySelector('.amt').textContent = won(price);
+          sheet.appendChild(cell);
+        });
+        container.appendChild(sheet);
+      }
+    }
+
+    $('rows').addEventListener('click', (e) => {
+      const row = e.target.closest('.price-row');
+      if (!row) return;
+      const r = rows[row.dataset.i];
+      if (e.target.dataset.d) {
+        r.qty = Math.max(0, r.qty + Number(e.target.dataset.d));
+      } else if (e.target.dataset.del !== undefined) {
+        rows.splice(row.dataset.i, 1);
+      } else return;
+      persist();
+      renderRows();
+    });
+
+    $('rows').addEventListener('change', (e) => {
+      if (e.target.dataset.price === undefined) return;
+      rows[e.target.closest('.price-row').dataset.i].price = Math.max(0, Math.round(Number(e.target.value) || 0));
+      persist();
+      renderSheets();
+    });
+
+    $('addRowBtn').addEventListener('click', () => {
+      rows.push({ price: 0, qty: 20 });
+      persist();
+      renderRows();
+      const inputs = document.querySelectorAll('[data-price]');
+      inputs[inputs.length - 1].focus();
+    });
+
+    $('resetBtn').addEventListener('click', () => {
+      if (!confirm('입력한 금액을 모두 지울까요?')) return;
+      rows = [{ price: 0, qty: 20 }];
+      persist();
+      renderRows();
+    });
+
+    $('printBtn').addEventListener('click', () => window.print());
+
+    renderRows();
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>상품 관리 · QR 계산대</title>
+  <title>설정 · QR 계산대</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
@@ -44,12 +44,42 @@
       <nav>
         <a href="index.html">계산대</a>
         <a href="sales.html">판매 내역</a>
-        <a href="admin.html" class="active">상품 관리</a>
+        <a href="admin.html" class="active">상품·설정</a>
       </nav>
     </header>
 
     <div class="page">
-      <h1>상품 관리</h1>
+      <h1>설정</h1>
+
+      <form class="card" id="sheetForm" autocomplete="off">
+        <h2 style="margin-top:0">구글 시트 연결 <small style="color:var(--muted);font-weight:600">(기기마다 한 번)</small></h2>
+        <div class="form-row">
+          <label>시트 웹앱 주소 <input id="sUrl" class="url" placeholder="https://script.google.com/macros/s/…/exec 또는 test"></label>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <label>판매처 비밀번호 <input id="sKey" placeholder="시트 메뉴 ③에서 확인"></label>
+          <label>기기 이름 <input id="sDevice" placeholder="예: 물품1"></label>
+          <button type="submit" class="btn primary">저장</button>
+          <button type="button" class="btn" id="testBtn">연결 테스트</button>
+          <span id="testResult" class="test-result"></span>
+        </div>
+        <p class="hint">테스트 모드: 주소에 <b>test</b>, 비밀번호에 <b>1234</b> → 구글 시트 없이 이 브라우저에서만 동작 (테스트 카드: 아래 이름표 인쇄에서 확인)</p>
+      </form>
+
+      <form class="card" id="foodForm" style="margin-top:16px" autocomplete="off">
+        <h2 style="margin-top:0">🍢 음식 메뉴 (9개)</h2>
+        <div class="food-edit" id="foodEdit"></div>
+        <div class="toolbar" style="margin-bottom:0">
+          <button type="submit" class="btn primary">음식 메뉴 저장</button>
+        </div>
+      </form>
+
+      <div class="toolbar" style="margin-top:16px">
+        <a class="btn primary" href="cards.html" style="text-decoration:none">🪪 참가자 이름표 QR 인쇄</a>
+        <a class="btn primary" href="price-qr.html" style="text-decoration:none">🏷️ 가격 QR 인쇄</a>
+      </div>
+
+      <h1 style="margin-top:36px">🎁 물품 상품 관리</h1>
 
       <form class="card" id="productForm" autocomplete="off">
         <div class="form-row">
@@ -79,12 +109,58 @@
     <div class="print-grid" id="printGrid"></div>
   </div>
 
+  <script src="config.js"></script>
   <script src="common.js"></script>
+  <script src="api.js"></script>
   <script>
     let products = [];
     let editingId = null;
 
     const $ = (id) => document.getElementById(id);
+
+    // ---------- 시트 연결 ----------
+    function fillSettings() {
+      const s = getSettings();
+      $('sUrl').value = s.url;
+      $('sKey').value = s.key;
+      $('sDevice').value = s.device;
+      $('foodEdit').innerHTML = s.foods.map((f, i) => `
+        <div class="food-row">
+          <span class="no">${i + 1}</span>
+          <input data-fname="${i}" value="${escapeHtml(f.name)}" placeholder="음식 이름">
+          <input data-fprice="${i}" type="number" min="0" step="1" value="${f.price}" placeholder="가격">
+        </div>`).join('');
+    }
+
+    function sheetValues() {
+      return { url: $('sUrl').value.trim(), key: $('sKey').value.trim(), device: $('sDevice').value.trim() };
+    }
+
+    $('sheetForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      saveSettings(sheetValues());
+      showToast('저장했어요', 'ok');
+    });
+
+    $('testBtn').addEventListener('click', async () => {
+      const v = sheetValues();
+      $('testResult').textContent = '확인 중…';
+      $('testResult').className = 'test-result';
+      const r = await api('ping', {}, { url: v.url, key: v.key });
+      $('testResult').textContent = r.ok ? `✅ 연결됨 (${r.title})` : `❌ ${apiErrorText(r)}`;
+      $('testResult').className = 'test-result ' + (r.ok ? 'ok' : 'err');
+      if (r.ok) saveSettings(v);
+    });
+
+    $('foodForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const foods = getSettings().foods.map((_, i) => ({
+        name: document.querySelector(`[data-fname="${i}"]`).value.trim() || `음식 ${i + 1}`,
+        price: Math.max(0, Math.round(Number(document.querySelector(`[data-fprice="${i}"]`).value) || 0)),
+      }));
+      saveSettings({ foods });
+      showToast('음식 메뉴를 저장했어요', 'ok');
+    });
 
     function makeQr(el, text, size) {
       el.innerHTML = '';
@@ -196,6 +272,7 @@
     });
 
     (async function init() {
+      fillSettings();
       products = await loadProducts();
       render();
     })();

@@ -59,9 +59,16 @@ a { color: var(--primary); }
   height: calc(100vh - 48px);
 }
 
+.left-panel {
+  flex: 0 0 65%;
+  display: flex;
+  min-width: 0;
+  background: #000;
+}
+
 .camera-panel {
   position: relative;
-  flex: 0 0 65%;
+  flex: 1;
   background: #000;
   overflow: hidden;
   border: 8px solid #000;
@@ -99,6 +106,35 @@ a { color: var(--primary); }
   color: #fff;
   z-index: 5;
 }
+
+.keypad-open {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 10px 16px;
+  font-size: 18px;
+  font-weight: 800;
+  background: #fff;
+  color: var(--text);
+  z-index: 5;
+}
+.keypad-box { max-width: 380px; }
+.keypad-display {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #f3f4f6;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: right;
+}
+.keypad-display span { font-size: 44px; font-weight: 900; color: var(--primary); }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.keypad button { padding: 16px 0; font-size: 30px; font-weight: 800; background: #e5e7eb; color: var(--text); }
+.keypad button:active { background: #d1d5db; }
+.keypad button.k-sub { font-size: 20px; background: #f3f4f6; }
+.keypad-actions { display: flex; gap: 8px; margin-top: 12px; }
+.keypad-actions .btn { flex: 1; padding: 14px; font-size: 20px; }
 
 .modal {
   position: fixed;
@@ -341,6 +377,18 @@ a { color: var(--primary); }
   width: 180px;
 }
 .form-row input.wide { width: 260px; }
+.form-row label:has(input.url) { flex: 1; }
+.form-row input.url { width: 100%; font-size: 16px; }
+.hint { margin: 12px 0 0; color: var(--muted); font-size: 15px; }
+.test-result { font-size: 17px; font-weight: 700; align-self: center; }
+.test-result.ok { color: var(--ok); }
+.test-result.err { color: var(--danger); }
+.food-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.food-row { display: flex; align-items: center; gap: 8px; }
+.food-row .no { width: 24px; font-weight: 800; color: var(--muted); }
+.food-row input { font: inherit; font-size: 18px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; min-width: 0; }
+.food-row input[data-fname] { flex: 1; }
+.food-row input[data-fprice] { width: 100px; }
 
 .btn {
   padding: 10px 18px;
@@ -392,9 +440,109 @@ table.data tr.editing { background: #eff6ff; }
 
 .print-only { display: none; }
 
+/* ---------- 모드 전환 / 상태 ---------- */
+.mode-switch { display: flex; gap: 4px; background: #1f2937; padding: 3px; border-radius: 10px; }
+.mode-switch button { padding: 6px 14px; font-size: 16px; font-weight: 700; background: transparent; color: #9ca3af; }
+.mode-switch button.active { background: #fff; color: #111827; }
+.sync-status { font-size: 14px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #374151; color: #d1d5db; }
+.sync-status.ok { background: #14532d; color: #bbf7d0; }
+.sync-status.test { background: #1e3a8a; color: #bfdbfe; }
+.sync-status.warn { background: #7c2d12; color: #fed7aa; }
+.topbar nav { margin-left: auto; }
+
+/* ---------- 음식 버튼 ---------- */
+.food-mode .camera-panel { flex: 0 0 38%; }
+.food-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg);
+}
+.food-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: transform 0.05s;
+}
+.food-btn:active { transform: scale(0.97); background: #fef3c7; }
+.food-btn.off { opacity: 0.45; }
+.food-btn .f-name { font-size: clamp(18px, 2.2vw, 30px); font-weight: 800; text-align: center; overflow-wrap: anywhere; }
+.food-btn .f-price { font-size: clamp(14px, 1.5vw, 20px); color: var(--muted); font-weight: 700; }
+.food-btn .badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 34px;
+}
+
+/* ---------- 결제 ---------- */
+.pay-hint {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+.btn-pay.secondary { padding: 12px; font-size: 20px; background: #fff; color: var(--ok); border: 2px solid var(--ok); }
+.btn-pay.secondary:not(:disabled):hover { background: #f0fdf4; }
+
+.pay-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 150;
+}
+.pay-box {
+  min-width: min(520px, 100%);
+  padding: 32px 40px;
+  border-radius: 24px;
+  background: #fff;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.pay-box .who { font-size: 34px; margin: 6px 0 12px; }
+.pay-box .big { font-size: clamp(40px, 6vw, 64px); font-weight: 900; }
+.pay-box .label { font-size: 22px; color: var(--muted); font-weight: 700; margin: 6px 0; }
+.pay-box.ok { border: 8px solid var(--ok); }
+.pay-box.ok .big { color: var(--ok); }
+.pay-box.err { border: 8px solid var(--danger); }
+.pay-box.err .big { color: var(--danger); }
+.pay-box.info { border: 8px solid var(--primary); }
+.pay-box.info .big { color: var(--primary); }
+.pay-box.wait .big { color: var(--muted); }
+
 @media (max-width: 800px) {
   .pos { flex-direction: column; height: auto; min-height: calc(100vh - 48px); }
-  .camera-panel { flex: none; height: 50vh; }
+  .left-panel { flex: none; height: 50vh; }
+  .food-mode .left-panel { height: auto; flex-direction: column; }
+  .food-mode .food-grid { height: 45vh; }
+  .food-mode .camera-panel { flex: none; height: 35vh; }
   .stats { grid-template-columns: 1fr; }
   .topbar { height: auto; padding: 8px 16px; flex-wrap: wrap; }
 }

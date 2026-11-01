@@ -5,6 +5,9 @@ const AMOUNT_RE = /^AMT:(\d+)$/i;
 let products = [];
 let cart = load(KEYS.cart, []); // [{ key, name, price, qty }]
 const lastScanAt = new Map();
+let settings = getSettings();
+let busy = false;      // 카드 결제 요청 중에는 다른 손님 QR 무시
+let pendingTx = null;  // 응답을 못 받은 결제 → 같은 손님이 다시 찍으면 같은 거래번호로 재시도(이중 차감 방지)
 
 const $ = (id) => document.getElementById(id);
 const cameraPanel = $('cameraPanel');
@@ -31,7 +34,13 @@ function renderCart(highlightKey) {
   $('totalQty').textContent = totalQty + '개';
   $('totalAmt').textContent = won(totalAmt);
   $('cartEmpty').classList.toggle('hidden', cart.length > 0);
+  $('cartEmpty').textContent = settings.mode === 'food' ? '음식 버튼을 눌러주세요' : '상품 QR을 찍어주세요';
   $('payBtn').disabled = cart.length === 0;
+  const online = Boolean(settings.url && settings.key);
+  $('payHint').classList.toggle('hidden', !online || cart.length === 0);
+  $('payBtn').textContent = online ? '종이 달란트로 결제' : '결제 완료';
+  $('payBtn').classList.toggle('secondary', online);
+  renderFoodBadges();
 
   if (highlightKey) {
     const el = cartList.querySelector('.cart-item.hl');
@@ -71,17 +80,198 @@ $('resetBtn').addEventListener('click', () => {
   renderCart();
 });
 
-$('payBtn').addEventListener('click', () => {
-  if (cart.length === 0) return;
-  const total = cart.reduce((s, i) => s + i.qty * i.price, 0);
+function cartTotal() { return cart.reduce((s, i) => s + i.qty * i.price, 0); }
+function cartItemsText() { return cart.map((i) => `${i.name} x${i.qty}`).join(', '); }
+
+function recordSale(extra) {
   const sales = load(KEYS.sales, []);
-  sales.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: new Date().toISOString(), total });
+  sales.push({ ts: new Date().toISOString(), total: cartTotal(), items: cartItemsText(), booth: settings.mode, status: 'ok', ...extra });
   save(KEYS.sales, sales);
   cart = [];
+  pendingTx = null;
   saveCart();
   renderCart();
+}
+
+// 종이 달란트(현금) 결제: 기기에 저장 후 시트로 전송(실패하면 나중에 재전송)
+$('payBtn').addEventListener('click', async () => {
+  if (cart.length === 0 || busy) return;
+  const total = cartTotal();
+  recordSale({ id: newTxId(settings.mode), method: 'cash', synced: false });
   showToast(`결제 완료 · ${won(total)}`, 'ok');
+  await syncPending();
+  updateStatus();
 });
+
+// ---------- 손님 QR(달란트 카드) ----------
+let overlayTimer = null;
+function showOverlay(type, html, ms = 3500) {
+  $('payBox').className = 'pay-box ' + type;
+  $('payBox').innerHTML = html;
+  $('payOverlay').classList.remove('hidden');
+  clearTimeout(overlayTimer);
+  if (ms) overlayTimer = setTimeout(hideOverlay, ms);
+}
+function hideOverlay() { $('payOverlay').classList.add('hidden'); }
+$('payOverlay').addEventListener('click', hideOverlay);
+
+function personLine(r) {
+  return `<div class="who">${escapeHtml(r.grade || '')} <b>${escapeHtml(r.name || '')}</b></div>`;
+}
+
+async function handleCustomer(code) {
+  if (busy) return;
+  if (!settings.url || !settings.key) {
+    beep(false);
+    flash('flash-err');
+    return showToast('설정에서 시트 주소·비밀번호를 먼저 입력하세요', 'error');
+  }
+  busy = true;
+  try {
+    if (cart.length === 0) {
+      // 장바구니가 비어 있으면 잔액 조회만
+      showOverlay('wait', '<div class="big">잔액 확인 중…</div>', 0);
+      const r = await api('lookup', { code });
+      if (!r.ok) return payFailed(r);
+      beep(true);
+      showOverlay('info', `${personLine(r)}<div class="label">현재 잔액</div><div class="big">${won(r.balance)}</div>`);
+      return;
+    }
+
+    const amount = cartTotal();
+    if (!pendingTx || pendingTx.code !== code || pendingTx.amount !== amount) {
+      pendingTx = { txId: newTxId(settings.mode), code, amount };
+    }
+    showOverlay('wait', `<div class="big">결제 중…</div><div class="label">${won(amount)}</div>`, 0);
+    const r = await api('pay', { code, amount, txId: pendingTx.txId, items: cartItemsText(), booth: settings.mode, device: settings.device });
+    if (!r.ok) return payFailed(r, amount);
+
+    recordSale({ id: pendingTx.txId, method: 'card', synced: true, code, name: r.name, grade: r.grade });
+    beep(true);
+    flash('flash-ok');
+    showOverlay('ok', `<div class="label">결제 완료</div>${personLine(r)}
+      <div class="big">− ${won(amount)}</div><div class="label">남은 잔액 <b>${won(r.balance)}</b></div>`, 4000);
+  } finally {
+    busy = false;
+  }
+}
+
+function payFailed(r, amount) {
+  beep(false);
+  flash('flash-err');
+  if (r.error === 'INSUFFICIENT') {
+    pendingTx = null;
+    return showOverlay('err', `<div class="label">잔액 부족</div>${personLine(r)}
+      <div class="big">${won(r.balance)}</div>
+      <div class="label">결제 금액 ${won(amount)} · <b>${won(amount - r.balance)} 부족</b></div>`, 6000);
+  }
+  if (r.error === 'NETWORK') {
+    return showOverlay('err', `<div class="big">연결 실패</div><div class="label">인터넷 확인 후 손님 QR을 다시 찍어주세요<br>(다시 찍어도 두 번 결제되지 않아요)</div>`, 6000);
+  }
+  pendingTx = null;
+  showOverlay('err', `<div class="big">${escapeHtml(apiErrorText(r))}</div>`, 5000);
+}
+
+// ---------- 금액 직접 입력 (물품) ----------
+let keypadValue = '';
+function setKeypad(v) {
+  keypadValue = v.replace(/^0+/, '').slice(0, 6);
+  $('keypadValue').textContent = Number(keypadValue || 0).toLocaleString('ko-KR');
+}
+function openKeypad(first = '') {
+  setKeypad(first);
+  $('keypadModal').classList.remove('hidden');
+}
+function closeKeypad() { $('keypadModal').classList.add('hidden'); }
+function keypadPress(k) {
+  if (k === 'close') return closeKeypad();
+  if (k === 'clear') return setKeypad('');
+  if (k === 'back') return setKeypad(keypadValue.slice(0, -1));
+  if (k === 'add') {
+    const price = Number(keypadValue);
+    if (!(price > 0)) return;
+    addToCart('AMT:' + price, won(price), price); // 금액 QR과 같은 항목으로 합쳐짐
+    beep(true);
+    closeKeypad();
+    return;
+  }
+  setKeypad(keypadValue + k);
+}
+$('keypadOpenBtn').addEventListener('click', () => openKeypad());
+$('keypadModal').addEventListener('click', (e) => {
+  if (e.target.id === 'keypadModal') return closeKeypad();
+  const k = e.target.closest('[data-k]');
+  if (k) keypadPress(k.dataset.k);
+});
+document.addEventListener('keydown', (e) => {
+  const typing = e.target instanceof Element && e.target.matches('input, textarea');
+  if (settings.mode !== 'goods' || typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  const open = !$('keypadModal').classList.contains('hidden');
+  if (/^[0-9]$/.test(e.key)) {
+    if (!open) openKeypad(e.key);
+    else keypadPress(e.key);
+  } else if (open && e.key === 'Enter') { e.preventDefault(); keypadPress('add'); }
+  else if (open && e.key === 'Backspace') keypadPress('back');
+  else if (open && e.key === 'Escape') closeKeypad();
+});
+
+// ---------- 물품 / 음식 모드 ----------
+function renderMode() {
+  const food = settings.mode === 'food';
+  document.body.classList.toggle('food-mode', food);
+  $('foodGrid').classList.toggle('hidden', !food);
+  $('keypadOpenBtn').classList.toggle('hidden', food);
+  $('scanHint').textContent = food ? '손님 QR을 비춰주세요' : 'QR 코드를 네모 안에 비춰주세요';
+  document.querySelectorAll('#modeSwitch button').forEach((b) => b.classList.toggle('active', b.dataset.mode === settings.mode));
+  $('foodGrid').innerHTML = settings.foods.map((f, i) => `
+    <button class="food-btn${f.price > 0 ? '' : ' off'}" data-food="${i}">
+      <span class="badge hidden"></span>
+      <span class="f-name">${escapeHtml(f.name)}</span>
+      <span class="f-price">${f.price > 0 ? won(f.price) : '가격 미설정'}</span>
+    </button>`).join('');
+  renderCart();
+}
+
+function renderFoodBadges() {
+  document.querySelectorAll('.food-btn').forEach((btn) => {
+    const item = cart.find((c) => c.key === 'F:' + btn.dataset.food);
+    const badge = btn.querySelector('.badge');
+    badge.textContent = item ? item.qty : '';
+    badge.classList.toggle('hidden', !item);
+  });
+}
+
+$('foodGrid').addEventListener('click', (e) => {
+  const btn = e.target.closest('.food-btn');
+  if (!btn) return;
+  const f = settings.foods[btn.dataset.food];
+  if (!(f.price > 0)) return showToast('설정에서 가격을 먼저 정해주세요', 'error');
+  addToCart('F:' + btn.dataset.food, f.name, f.price);
+});
+
+$('modeSwitch').addEventListener('click', (e) => {
+  const mode = e.target.dataset.mode;
+  if (!mode || mode === settings.mode) return;
+  if (cart.length && !confirm('장바구니를 비우고 모드를 바꿀까요?')) return;
+  cart = [];
+  saveCart();
+  saveSettings({ mode });
+  settings = getSettings();
+  renderMode();
+});
+
+function updateStatus() {
+  const el = $('syncStatus');
+  const n = pendingCount();
+  let text;
+  let cls;
+  if (!settings.url || !settings.key) { text = '시트 미설정'; cls = 'warn'; }
+  else if (isTestMode()) { text = '테스트 모드'; cls = 'test'; }
+  else { text = navigator.onLine ? '시트 연결됨' : '오프라인'; cls = navigator.onLine ? 'ok' : 'warn'; }
+  if (n) { text += ` · 미전송 ${n}건`; cls = 'warn'; }
+  el.textContent = text;
+  el.className = 'sync-status ' + cls;
+}
 
 // ---------- 피드백 ----------
 let audioCtx = null;
@@ -167,6 +357,9 @@ function onScan(text) {
   const lastSeen = lastScanAt.get(text) || 0;
   lastScanAt.set(text, now);
   if (now - lastSeen < COOLDOWN_MS) return;
+
+  const code = parseCustomerCode(text);
+  if (code) return handleCustomer(code);
 
   const amt = text.match(AMOUNT_RE);
   if (amt && Number(amt[1]) > 0) {
@@ -293,11 +486,21 @@ $('phoneModal').addEventListener('click', (e) => {
 window.addEventListener('storage', (e) => {
   if (e.key === KEYS.products) products = load(KEYS.products, []);
   if (e.key === KEYS.cart) { cart = load(KEYS.cart, []); renderCart(); }
+  if (e.key === SETTINGS_KEY) { settings = getSettings(); renderMode(); updateStatus(); }
 });
 
+async function resync() {
+  await syncPending();
+  updateStatus();
+}
+window.addEventListener('online', resync);
+window.addEventListener('offline', updateStatus);
+
 (async function init() {
-  renderCart();
+  renderMode();
+  updateStatus();
   products = await loadProducts();
   loadSounds();
   startCamera();
+  resync();
 })();
