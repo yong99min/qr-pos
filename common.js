@@ -1,4 +1,32 @@
 // 공통 유틸: localStorage 저장/불러오기, 금액 포맷, 토스트
+// 파일이 빠졌거나 스크립트 오류가 나면 화면 맨 위에 빨간 안내를 띄움 (GitHub 업로드 누락 확인용)
+window.addEventListener('error', (e) => {
+  const where = e.filename ? e.filename.split('/').pop() : '';
+  showFatal(`오류: ${e.message}${where ? ` (${where})` : ''}`);
+});
+window.addEventListener('load', () => {
+  const loaded = {
+    'data.js': () => typeof FOODS !== 'undefined',
+    'api.js': () => typeof getSettings !== 'undefined',
+    'config.js': () => typeof window.POS_CONFIG !== 'undefined',
+    'app.js': () => typeof onScan !== 'undefined',
+  };
+  const missing = [...document.scripts]
+    .map((s) => (s.getAttribute('src') || '').split('/').pop())
+    .filter((f) => loaded[f] && !loaded[f]());
+  if (missing.length) showFatal(`파일을 못 불러왔어요: ${missing.join(', ')} — GitHub에 이 파일이 올라가 있는지 확인하세요`);
+});
+function showFatal(msg) {
+  let bar = document.getElementById('fatalBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'fatalBar';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:999;padding:12px 16px;background:#dc2626;color:#fff;font:700 16px sans-serif';
+    document.body.appendChild(bar);
+  }
+  bar.textContent = '⚠️ ' + msg;
+}
+
 const KEYS = {
   cart: 'pos_cart',
   products: 'pos_products',
@@ -32,24 +60,9 @@ function escapeHtml(s) {
   }[c]));
 }
 
-async function fetchDefaultProducts() {
-  try {
-    const res = await fetch('products.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error(res.status);
-    return await res.json();
-  } catch (e) {
-    console.warn('products.json 불러오기 실패', e);
-    return [];
-  }
-}
-
-// 상품 목록: localStorage 우선, 없으면 products.json을 기본값으로 저장
-async function loadProducts() {
-  const stored = load(KEYS.products, null);
-  if (Array.isArray(stored)) return stored;
-  const products = await fetchDefaultProducts();
-  save(KEYS.products, products);
-  return products;
+// 물품 목록은 data.js 의 GOODS 고정값 사용
+function loadProducts() {
+  return typeof GOODS !== 'undefined' ? GOODS : [];
 }
 
 let toastTimer = null;

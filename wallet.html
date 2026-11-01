@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>내 달란트</title>
+  <meta name="theme-color" content="#2563eb">
+  <link rel="stylesheet" href="style.css?v=20261101a">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { background: #eef2ff; }
+    .wallet { max-width: 440px; margin: 0 auto; padding: 20px 16px 48px; text-align: center; }
+    .w-card { background: #fff; border-radius: 24px; padding: 24px 20px; box-shadow: 0 8px 30px rgba(37, 99, 235, 0.12); }
+    .w-title { font-size: 16px; font-weight: 800; color: var(--primary); letter-spacing: 1px; }
+    .w-who { font-size: 30px; font-weight: 900; margin: 8px 0 4px; }
+    .w-who small { font-size: 20px; color: var(--muted); font-weight: 700; margin-right: 6px; }
+    .w-bal-label { margin-top: 12px; color: var(--muted); font-weight: 700; font-size: 16px; }
+    .w-bal { font-size: 44px; font-weight: 900; color: var(--primary); }
+    .w-qr { display: flex; justify-content: center; margin: 20px 0 8px; }
+    .w-qr img, .w-qr canvas { width: min(70vw, 260px); height: min(70vw, 260px); }
+    .w-tip { color: var(--muted); font-size: 15px; }
+    .w-refresh { margin-top: 16px; }
+    .w-hist { margin-top: 20px; text-align: left; }
+    .w-hist h3 { font-size: 18px; margin: 0 0 8px 4px; }
+    .w-hist ul { list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 16px; overflow: hidden; }
+    .w-hist li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 15px; }
+    .w-hist li:last-child { border-bottom: none; }
+    .w-hist .what { color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .w-hist .amt { font-weight: 800; white-space: nowrap; }
+    .w-hist li.cancel .amt { color: #9ca3af; text-decoration: line-through; }
+    .w-msg { padding: 40px 16px; font-size: 18px; line-height: 1.6; color: var(--muted); }
+    .updated { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wallet">
+    <div class="w-card" id="card">
+      <div class="w-title">TALENT CARD · 달란트 카드</div>
+      <div class="w-who" id="who">불러오는 중…</div>
+      <div class="w-bal-label">남은 달란트</div>
+      <div class="w-bal" id="bal">-</div>
+      <div class="w-qr" id="qr"></div>
+      <div class="w-tip">계산할 때 이 화면의 QR을 판매처 카메라에 보여주세요<br>(화면 밝기를 높이면 더 잘 찍혀요)</div>
+      <div class="updated" id="updated"></div>
+      <button class="btn primary w-refresh" id="refreshBtn">↻ 잔액 새로고침</button>
+    </div>
+
+    <div class="w-hist">
+      <h3>사용 내역</h3>
+      <ul id="hist"><li>불러오는 중…</li></ul>
+    </div>
+  </div>
+
+  <script src="config.js?v=20261101a"></script>
+  <script src="data.js?v=20261101a"></script>
+  <script src="common.js?v=20261101a"></script>
+  <script src="api.js?v=20261101a"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase();
+
+    function showMessage(html) {
+      $('card').innerHTML = `<div class="w-msg">${html}</div>`;
+      document.querySelector('.w-hist').classList.add('hidden');
+    }
+
+    async function refresh() {
+      $('refreshBtn').disabled = true;
+      const r = await fetchWallet(code);
+      $('refreshBtn').disabled = false;
+      if (!r.ok) {
+        if (r.error === 'UNKNOWN_CODE') return showMessage('등록되지 않은 카드예요.<br>선생님께 문의해주세요.');
+        $('updated').textContent = '⚠️ ' + apiErrorText(r);
+        return;
+      }
+      $('who').innerHTML = `<small>${escapeHtml(r.grade)}</small>${escapeHtml(r.name)}`;
+      $('bal').textContent = won(r.balance);
+      $('updated').textContent = '확인 시각 ' + dateTimeText(new Date()).slice(11, 16);
+      $('hist').innerHTML = r.history && r.history.length
+        ? r.history.map((h) => `
+          <li class="${h.status === '취소' ? 'cancel' : ''}">
+            <div><div>${escapeHtml(h.booth)}${h.status === '취소' ? ' (취소)' : ''}</div>
+              <div class="what">${dateTimeText(new Date(h.time)).slice(5, 16)} · ${escapeHtml(h.items || '')}</div></div>
+            <div class="amt">− ${won(h.amount)}</div>
+          </li>`).join('')
+        : '<li>아직 사용 내역이 없어요</li>';
+    }
+
+    if (!code) {
+      showMessage('이름표의 QR을 폰 카메라로 찍어서 들어와주세요.');
+    } else {
+      // 판매처 카메라가 읽는 QR = 이 페이지 주소 (코드만 포함)
+      new QRCode($('qr'), { text: location.origin + location.pathname + '?c=' + code, width: 520, height: 520, correctLevel: QRCode.CorrectLevel.M });
+      $('refreshBtn').addEventListener('click', refresh);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+      refresh();
+    }
+  </script>
+</body>
+</html>

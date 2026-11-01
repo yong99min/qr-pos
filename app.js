@@ -484,7 +484,6 @@ $('phoneModal').addEventListener('click', (e) => {
 
 // ---------- 시작 ----------
 window.addEventListener('storage', (e) => {
-  if (e.key === KEYS.products) products = load(KEYS.products, []);
   if (e.key === KEYS.cart) { cart = load(KEYS.cart, []); renderCart(); }
   if (e.key === SETTINGS_KEY) { settings = getSettings(); renderMode(); updateStatus(); }
 });
@@ -499,7 +498,7 @@ window.addEventListener('offline', updateStatus);
 (async function init() {
   renderMode();
   updateStatus();
-  products = await loadProducts();
+  products = loadProducts();
   loadSounds();
   startCamera();
   resync();

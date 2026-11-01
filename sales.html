@@ -4,7 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>판매 내역 · QR 계산대</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261101a">
+  <style>
+    .page { max-width: 1200px; }
+    table.data td.items { font-size: 16px; color: var(--muted); max-width: 320px; }
+    tr.canceled td { color: #9ca3af; text-decoration: line-through; }
+    tr.canceled td.actions, tr.canceled td.state { text-decoration: none; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 14px; font-weight: 700; }
+    .tag.card { background: #dbeafe; color: #1d4ed8; }
+    .tag.cash { background: #fef3c7; color: #92400e; }
+    .tag.cancel { background: #f3f4f6; color: #6b7280; }
+    .tag.unsent { background: #fee2e2; color: #b91c1c; }
+    .pending-bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 16px; border-radius: 12px; background: #fff7ed; color: #9a3412; font-weight: 700; font-size: 18px; }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -12,17 +24,22 @@
     <nav>
       <a href="index.html">계산대</a>
       <a href="sales.html" class="active">판매 내역</a>
-      <a href="admin.html">상품 관리</a>
+      <a href="admin.html">상품·설정</a>
     </nav>
   </header>
 
   <div class="page">
-    <h1>판매 내역</h1>
+    <h1>판매 내역 <small style="font-size:18px;color:var(--muted)">(이 기기)</small></h1>
 
     <div class="stats">
       <div class="stat today"><div class="label">오늘 총 판매액</div><div class="value" id="todayTotal">0달란트</div></div>
       <div class="stat"><div class="label">전체 총 판매액</div><div class="value" id="allTotal">0달란트</div></div>
       <div class="stat"><div class="label">결제 건수</div><div class="value" id="count">0건</div></div>
+    </div>
+
+    <div class="pending-bar hidden" id="pendingBar">
+      <span id="pendingText"></span>
+      <button class="btn primary small" id="sendBtn">미전송 내역 시트로 보내기</button>
     </div>
 
     <div class="toolbar">
@@ -36,7 +53,7 @@
     </div>
 
     <table class="data" id="listTable">
-      <thead><tr><th>날짜·시간</th><th class="num">최종 금액</th><th></th></tr></thead>
+      <thead><tr><th>날짜·시간</th><th>판매처</th><th>손님</th><th>내역</th><th class="num">금액</th><th>결제</th><th></th></tr></thead>
       <tbody id="listRows"></tbody>
     </table>
 
@@ -46,18 +63,21 @@
     </table>
   </div>
 
-  <script src="common.js"></script>
+  <script src="config.js?v=20261101a"></script>
+  <script src="data.js?v=20261101a"></script>
+  <script src="common.js?v=20261101a"></script>
+  <script src="api.js?v=20261101a"></script>
   <script>
     const $ = (id) => document.getElementById(id);
+    const BOOTH = { goods: '물품', food: '음식' };
     let sales = [];
 
-    function sorted() {
-      return [...sales].sort((a, b) => new Date(b.ts) - new Date(a.ts));
-    }
+    const active = () => sales.filter((s) => s.status !== 'cancel');
+    const sorted = () => [...sales].sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
     function dailyTotals() {
       const map = new Map();
-      sorted().forEach((s) => {
+      active().sort((a, b) => new Date(b.ts) - new Date(a.ts)).forEach((s) => {
         const k = dateKey(new Date(s.ts));
         const d = map.get(k) || { date: k, count: 0, total: 0 };
         d.count += 1;
@@ -67,23 +87,38 @@
       return [...map.values()];
     }
 
+    function payTag(s) {
+      if (s.status === 'cancel') return `<span class="tag cancel">취소</span>${s.synced === false ? ' <span class="tag unsent">미전송</span>' : ''}`;
+      if (s.method === 'card') return '<span class="tag card">카드</span>';
+      if (s.method === 'cash') return `<span class="tag cash">종이</span>${s.synced ? '' : ' <span class="tag unsent">미전송</span>'}`;
+      return '';
+    }
+
     function render() {
       sales = load(KEYS.sales, []);
       const today = dateKey(new Date());
-      const todayTotal = sales.filter((s) => dateKey(new Date(s.ts)) === today).reduce((a, s) => a + s.total, 0);
-      $('todayTotal').textContent = won(todayTotal);
-      $('allTotal').textContent = won(sales.reduce((a, s) => a + s.total, 0));
-      $('count').textContent = sales.length.toLocaleString('ko-KR') + '건';
+      const list = active();
+      $('todayTotal').textContent = won(list.filter((s) => dateKey(new Date(s.ts)) === today).reduce((a, s) => a + s.total, 0));
+      $('allTotal').textContent = won(list.reduce((a, s) => a + s.total, 0));
+      $('count').textContent = list.length.toLocaleString('ko-KR') + '건';
 
-      const list = sorted();
-      $('listRows').innerHTML = list.length
-        ? list.map((s) => `
-          <tr>
+      const n = pendingCount();
+      $('pendingBar').classList.toggle('hidden', n === 0);
+      $('pendingText').textContent = `시트로 아직 못 보낸 내역 ${n}건`;
+
+      const rows = sorted();
+      $('listRows').innerHTML = rows.length
+        ? rows.map((s) => `
+          <tr class="${s.status === 'cancel' ? 'canceled' : ''}">
             <td>${dateTimeText(new Date(s.ts))}</td>
+            <td>${BOOTH[s.booth] || ''}</td>
+            <td>${s.name ? `${escapeHtml(s.grade || '')} ${escapeHtml(s.name)}` : ''}</td>
+            <td class="items">${escapeHtml(s.items || '')}</td>
             <td class="num"><b>${won(s.total)}</b></td>
-            <td class="actions"><button class="btn small danger" data-del="${escapeHtml(s.id)}">삭제</button></td>
+            <td class="state">${payTag(s)}</td>
+            <td class="actions">${s.status === 'cancel' ? '' : `<button class="btn small danger" data-cancel="${escapeHtml(s.id)}">결제 취소</button>`}</td>
           </tr>`).join('')
-        : '<tr class="empty-row"><td colspan="3">아직 결제 내역이 없어요</td></tr>';
+        : '<tr class="empty-row"><td colspan="7">아직 결제 내역이 없어요</td></tr>';
 
       const daily = dailyTotals();
       $('dailyRows').innerHTML = daily.length
@@ -104,31 +139,66 @@
       $('dailyTable').classList.toggle('hidden', tab !== 'daily');
     });
 
-    $('listRows').addEventListener('click', (e) => {
-      const id = e.target.dataset.del;
+    $('listRows').addEventListener('click', async (e) => {
+      const id = e.target.dataset.cancel;
       if (!id) return;
       const s = sales.find((x) => x.id === id);
-      if (!s || !confirm(`${dateTimeText(new Date(s.ts))} · ${won(s.total)} 내역을 삭제할까요?`)) return;
-      save(KEYS.sales, sales.filter((x) => x.id !== id));
+      if (!s) return;
+      const who = s.name ? `${s.grade || ''} ${s.name}님에게 ${won(s.total)}이 돌려집니다.` : '';
+      if (!confirm(`${dateTimeText(new Date(s.ts))} · ${won(s.total)} 결제를 취소할까요?\n${who}`)) return;
+
+      if (s.method === 'card') {
+        // 카드 결제는 잔액을 바로 돌려줘야 하므로 시트에 즉시 반영
+        e.target.disabled = true;
+        const r = await api('cancel', { txId: s.id });
+        if (!r.ok) {
+          e.target.disabled = false;
+          return alert('취소 실패: ' + apiErrorText(r));
+        }
+        s.status = 'cancel';
+        s.synced = true;
+        save(KEYS.sales, sales);
+        showToast(r.balance !== undefined ? `취소 완료 · ${s.name} 잔액 ${won(r.balance)}` : '취소 완료', 'ok');
+      } else {
+        s.status = 'cancel';
+        if (s.method) s.synced = false;
+        save(KEYS.sales, sales);
+        await syncPending();
+        showToast('취소 완료', 'ok');
+      }
+      render();
+    });
+
+    $('sendBtn').addEventListener('click', async () => {
+      $('sendBtn').disabled = true;
+      const sent = await syncPending();
+      $('sendBtn').disabled = false;
+      const left = pendingCount();
+      showToast(left ? `${sent}건 보냄 · ${left}건 남음 (연결 확인)` : `${sent}건 모두 보냈어요`, left ? 'error' : 'ok');
       render();
     });
 
     $('clearBtn').addEventListener('click', () => {
       if (sales.length === 0) return;
-      if (!confirm(`판매 내역 ${sales.length}건을 모두 삭제할까요?\n되돌릴 수 없어요.`)) return;
+      if (!confirm(`이 기기의 판매 내역 ${sales.length}건을 모두 삭제할까요?\n(구글 시트 기록은 그대로 남아요)`)) return;
+      if (pendingCount() && !confirm(`시트로 못 보낸 내역 ${pendingCount()}건도 사라져요. 정말 삭제할까요?`)) return;
       save(KEYS.sales, []);
       render();
     });
 
     $('csvBtn').addEventListener('click', () => {
       if (sales.length === 0) return alert('내보낼 내역이 없어요.');
-      const rows = [['날짜', '시간', '최종금액']];
+      const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = [['거래번호', '날짜', '시간', '판매처', '학년', '이름', '내역', '금액', '결제', '상태']];
       sorted().forEach((s) => {
         const [date, time] = dateTimeText(new Date(s.ts)).split(' ');
-        rows.push([date, time, s.total]);
+        rows.push([s.id, date, time, BOOTH[s.booth] || '', s.grade || '', s.name || '', s.items || '', s.total,
+          s.method === 'card' ? '카드' : '종이', s.status === 'cancel' ? '취소' : '정상']);
       });
+      const total = active().reduce((a, s) => a + s.total, 0);
+      rows.push(['', '', '', '', '', '', '총합계(취소 제외)', total, '', '']);
       // 엑셀에서 한글이 깨지지 않도록 BOM 추가
-      const csv = '﻿' + rows.map((r) => r.join(',')).join('\r\n');
+      const csv = '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n');
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
       const a = document.createElement('a');
       a.href = url;
@@ -138,7 +208,9 @@
     });
 
     window.addEventListener('storage', (e) => { if (e.key === KEYS.sales) render(); });
+    window.addEventListener('online', async () => { await syncPending(); render(); });
     render();
+    syncPending().then((n) => { if (n) render(); });
   </script>
 </body>
 </html>
