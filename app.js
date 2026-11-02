@@ -113,7 +113,10 @@ const ROSTER_KEY = 'pos_roster';
 let roster = load(ROSTER_KEY, []);
 let picked = null;
 
-function cashModalOpen() { return !$('cashModal').classList.contains('hidden'); }
+function cashModalOpen() {
+  const m = $('cashModal');
+  return Boolean(m) && !m.classList.contains('hidden');
+}
 
 function renderPeople() {
   const q = $('cashSearch').value.trim().replace(/\s+/g, '');
