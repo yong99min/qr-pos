@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>판매 내역 · QR 계산대</title>
-  <link rel="stylesheet" href="style.css?v=20261101a">
+  <link rel="stylesheet" href="style.css?v=20261102a">
   <style>
     .page { max-width: 1200px; }
     table.data td.items { font-size: 16px; color: var(--muted); max-width: 320px; }
@@ -63,10 +63,10 @@
     </table>
   </div>
 
-  <script src="config.js?v=20261101a"></script>
-  <script src="data.js?v=20261101a"></script>
-  <script src="common.js?v=20261101a"></script>
-  <script src="api.js?v=20261101a"></script>
+  <script src="config.js?v=20261102a"></script>
+  <script src="data.js?v=20261102a"></script>
+  <script src="common.js?v=20261102a"></script>
+  <script src="api.js?v=20261102a"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const BOOTH = { goods: '물품', food: '음식' };
@@ -144,7 +144,7 @@
       if (!id) return;
       const s = sales.find((x) => x.id === id);
       if (!s) return;
-      const who = s.name ? `${s.grade || ''} ${s.name}님에게 ${won(s.total)}이 돌려집니다.` : '';
+      const who = s.name && s.method === 'card' ?`${s.grade || ''} ${s.name}님에게 ${won(s.total)}이 돌려집니다.` : '';
       if (!confirm(`${dateTimeText(new Date(s.ts))} · ${won(s.total)} 결제를 취소할까요?\n${who}`)) return;
 
       if (s.method === 'card') {

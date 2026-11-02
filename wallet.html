@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>내 달란트</title>
   <meta name="theme-color" content="#2563eb">
-  <link rel="stylesheet" href="style.css?v=20261101a">
+  <link rel="stylesheet" href="style.css?v=20261102a">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     body { background: #eef2ff; }
@@ -51,10 +51,10 @@
     </div>
   </div>
 
-  <script src="config.js?v=20261101a"></script>
-  <script src="data.js?v=20261101a"></script>
-  <script src="common.js?v=20261101a"></script>
-  <script src="api.js?v=20261101a"></script>
+  <script src="config.js?v=20261102a"></script>
+  <script src="data.js?v=20261102a"></script>
+  <script src="common.js?v=20261102a"></script>
+  <script src="api.js?v=20261102a"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase();
@@ -79,9 +79,9 @@
       $('hist').innerHTML = r.history && r.history.length
         ? r.history.map((h) => `
           <li class="${h.status === '취소' ? 'cancel' : ''}">
-            <div><div>${escapeHtml(h.booth)}${h.status === '취소' ? ' (취소)' : ''}</div>
+            <div><div>${escapeHtml(h.booth)}${h.status === '취소' ? ' (취소)' : ''}${h.method === '현금' ? ' · 종이 달란트' : ''}</div>
               <div class="what">${dateTimeText(new Date(h.time)).slice(5, 16)} · ${escapeHtml(h.items || '')}</div></div>
-            <div class="amt">− ${won(h.amount)}</div>
+            <div class="amt">${h.method === '현금' ? '📄 ' + won(h.amount) : '− ' + won(h.amount)}</div>
           </li>`).join('')
         : '<li>아직 사용 내역이 없어요</li>';
     }

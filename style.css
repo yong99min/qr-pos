@@ -155,6 +155,17 @@ a { color: var(--primary); }
   text-align: center;
 }
 .modal-box h3 { margin: 0 0 16px; font-size: 22px; }
+.cash-box { max-width: 520px; }
+.cash-search { width: 100%; font: inherit; font-size: 22px; padding: 10px 12px; border: 2px solid #cbd5e1; border-radius: 12px; }
+.person-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 46vh; overflow-y: auto; text-align: left; }
+.person-list li { padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 20px; cursor: pointer; }
+.person-list li:hover { background: #f0fdf4; }
+.person-list li small { color: var(--muted); margin-right: 8px; }
+.person-list li.msg { color: var(--muted); cursor: default; text-align: center; }
+.cash-who { font-size: 28px; font-weight: 800; margin: 8px 0 16px; }
+.cash-who small { display: block; font-size: 18px; color: var(--muted); }
+.cash-choice { display: block; width: 100%; margin-top: 10px; padding: 14px; font-size: 21px; font-weight: 800; }
+.cash-choice small { display: block; font-size: 15px; font-weight: 600; opacity: 0.8; }
 .phone-qr { display: flex; justify-content: center; }
 .phone-qr img, .phone-qr canvas { width: 240px; height: 240px; }
 .phone-url { margin: 12px 0; font-size: 18px; font-weight: 700; word-break: break-all; }

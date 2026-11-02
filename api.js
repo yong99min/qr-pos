@@ -129,7 +129,8 @@ async function mockApi(action, req) {
     }
     case 'cash': {
       if (!db.tx.some((t) => t.id === req.txId)) {
-        db.tx.push({ id: req.txId, time: new Date().toISOString(), booth: boothName, code: '', items: req.items, amount: req.amount, method: '현금', status: '정상' });
+        const p = person(req.code);
+        db.tx.push({ id: req.txId, time: new Date().toISOString(), booth: boothName, code: p ? p.code : '', items: req.items, amount: req.amount, method: '현금', status: '정상' });
       }
       return done({ ok: true });
     }
@@ -157,7 +158,7 @@ async function syncPending() {
     let r;
     if (sale.status === 'cancel') r = await api('cancel', { txId: sale.id });
     else if (sale.method === 'card') continue; // 카드 결제는 결제 시점에 이미 시트에 기록됨
-    else r = await api('cash', { txId: sale.id, amount: sale.total, items: sale.items || '', booth: sale.booth, device: s.device });
+    else r = await api('cash', { txId: sale.id, code: sale.code || '', amount: sale.total, items: sale.items || '', booth: sale.booth, device: s.device });
     if (r.ok || r.error === 'NO_TX') { sale.synced = true; sent++; }
     else if (r.error === 'NETWORK') break;
   }

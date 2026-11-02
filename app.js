@@ -94,13 +94,84 @@ function recordSale(extra) {
 }
 
 // 종이 달란트(현금) 결제: 기기에 저장 후 시트로 전송(실패하면 나중에 재전송)
-$('payBtn').addEventListener('click', async () => {
-  if (cart.length === 0 || busy) return;
+async function payCash(person) {
   const total = cartTotal();
-  recordSale({ id: newTxId(settings.mode), method: 'cash', synced: false });
-  showToast(`결제 완료 · ${won(total)}`, 'ok');
+  recordSale({ id: newTxId(settings.mode), method: 'cash', synced: false, ...(person ? { code: person.code, name: person.name, grade: person.grade } : {}) });
+  showToast(`결제 완료 · ${person ? person.name + ' · ' : ''}${won(total)}`, 'ok');
   await syncPending();
   updateStatus();
+}
+
+$('payBtn').addEventListener('click', () => {
+  if (cart.length === 0 || busy) return;
+  if (!settings.url || !settings.key) return payCash(null); // 시트 미설정이면 바로 결제
+  openCashModal();
+});
+
+// ---------- 종이 결제: 누가 냈는지 명단에서 고르기 ----------
+const ROSTER_KEY = 'pos_roster';
+let roster = load(ROSTER_KEY, []);
+let picked = null;
+
+function cashModalOpen() { return !$('cashModal').classList.contains('hidden'); }
+
+function renderPeople() {
+  const q = $('cashSearch').value.trim().replace(/\s+/g, '');
+  const list = q ? roster.filter((p) => (p.grade + p.name).replace(/\s+/g, '').includes(q)) : roster;
+  $('personList').innerHTML = list.length
+    ? list.slice(0, 50).map((p) => `<li data-code="${escapeHtml(p.code)}"><small>${escapeHtml(p.grade)}</small>${escapeHtml(p.name)}</li>`).join('')
+    : `<li class="msg">${roster.length ? '찾는 이름이 없어요' : '명단 불러오는 중…'}</li>`;
+}
+
+function showCashStep(confirmStep) {
+  $('cashPickStep').classList.toggle('hidden', confirmStep);
+  $('cashConfirmStep').classList.toggle('hidden', !confirmStep);
+}
+
+async function openCashModal() {
+  picked = null;
+  $('cashTotal').textContent = won(cartTotal());
+  $('cashSearch').value = '';
+  showCashStep(false);
+  renderPeople();
+  $('cashModal').classList.remove('hidden');
+  $('cashSearch').focus();
+  const r = await api('roster');
+  if (r.ok) {
+    roster = r.people;
+    save(ROSTER_KEY, roster);
+    if (cashModalOpen()) renderPeople();
+  } else if (!roster.length) {
+    $('personList').innerHTML = `<li class="msg">명단을 못 불러왔어요 (${escapeHtml(apiErrorText(r))})</li>`;
+  }
+}
+function closeCashModal() { $('cashModal').classList.add('hidden'); }
+
+$('cashSearch').addEventListener('input', renderPeople);
+$('cashSearch').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeCashModal();
+  if (e.key === 'Enter') {
+    const first = $('personList').querySelector('li[data-code]');
+    if (first) first.click();
+  }
+});
+
+$('cashModal').addEventListener('click', (e) => {
+  if (e.target.id === 'cashModal') return closeCashModal();
+  const li = e.target.closest('li[data-code]');
+  if (li) {
+    picked = roster.find((p) => p.code === li.dataset.code);
+    $('cashWho').innerHTML = `<small>${escapeHtml(picked.grade)}</small>${escapeHtml(picked.name)}`;
+    return showCashStep(true);
+  }
+  const act = e.target.closest('[data-cash]');
+  if (!act) return;
+  const a = act.dataset.cash;
+  if (a === 'close') closeCashModal();
+  else if (a === 'back') { showCashStep(false); $('cashSearch').focus(); }
+  else if (a === 'anon') { closeCashModal(); payCash(null); }
+  else if (a === 'paper') { closeCashModal(); payCash(picked); }
+  else if (a === 'deduct') { closeCashModal(); handleCustomer(picked.code); } // QR 찍은 것과 똑같이 잔액 차감
 });
 
 // ---------- 손님 QR(달란트 카드) ----------
@@ -357,6 +428,7 @@ function onScan(text) {
   const lastSeen = lastScanAt.get(text) || 0;
   lastScanAt.set(text, now);
   if (now - lastSeen < COOLDOWN_MS) return;
+  if (cashModalOpen()) return; // 종이 결제 창이 떠 있는 동안은 스캔 무시
 
   const code = parseCustomerCode(text);
   if (code) return handleCustomer(code);

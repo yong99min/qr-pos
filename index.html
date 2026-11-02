@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QR 계산대</title>
-  <link rel="stylesheet" href="style.css?v=20261101a">
+  <link rel="stylesheet" href="style.css?v=20261102a">
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
@@ -67,6 +67,26 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="cashModal">
+    <div class="modal-box cash-box">
+      <h3>📄 종이 달란트 결제 · <span id="cashTotal"></span></h3>
+      <div id="cashPickStep">
+        <input class="cash-search" id="cashSearch" placeholder="이름 또는 학년으로 찾기" autocomplete="off">
+        <ul class="person-list" id="personList"></ul>
+        <div class="keypad-actions">
+          <button class="btn" data-cash="close">닫기</button>
+          <button class="btn" data-cash="anon">이름 없이 결제</button>
+        </div>
+      </div>
+      <div id="cashConfirmStep" class="hidden">
+        <div class="cash-who" id="cashWho"></div>
+        <button class="btn primary cash-choice" data-cash="paper">📄 종이로 받음<small>잔액은 그대로, 이 친구 이름으로 기록</small></button>
+        <button class="btn cash-choice" data-cash="deduct">💳 이 친구 잔액에서 차감<small>이름표를 안 가져왔을 때</small></button>
+        <button class="btn" data-cash="back" style="width:100%;margin-top:8px">← 다시 고르기</button>
+      </div>
+    </div>
+  </div>
+
   <div class="pay-overlay hidden" id="payOverlay"><div class="pay-box" id="payBox"></div></div>
 
   <div class="modal hidden" id="phoneModal">
@@ -83,10 +103,10 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="config.js?v=20261101a"></script>
-  <script src="data.js?v=20261101a"></script>
-  <script src="common.js?v=20261101a"></script>
-  <script src="api.js?v=20261101a"></script>
-  <script src="app.js?v=20261101a"></script>
+  <script src="config.js?v=20261102a"></script>
+  <script src="data.js?v=20261102a"></script>
+  <script src="common.js?v=20261102a"></script>
+  <script src="api.js?v=20261102a"></script>
+  <script src="app.js?v=20261102a"></script>
 </body>
 </html>
