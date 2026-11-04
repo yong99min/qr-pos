@@ -10,7 +10,7 @@ const FOODS = [
   { name: '순대', price: 20 },
   { name: '어묵', price: 20 },
   { name: '라면', price: 20 },
-  { name: '콜팝', price: 40 },
+  { name: '치킨팝', price: 40 },
   { name: '맛감자', price: 30 },
   { name: '음료', price: 10 },
   { name: '아이스티', price: 20 },
