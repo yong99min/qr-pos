@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>내 달란트</title>
   <meta name="theme-color" content="#2563eb">
-  <link rel="stylesheet" href="style.css?v=20261102a">
+  <link rel="stylesheet" href="style.css?v=20261108a">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     body { background: #eef2ff; }
@@ -51,10 +51,10 @@
     </div>
   </div>
 
-  <script src="config.js?v=20261102a"></script>
-  <script src="data.js?v=20261102a"></script>
-  <script src="common.js?v=20261102a"></script>
-  <script src="api.js?v=20261102a"></script>
+  <script src="config.js?v=20261108a"></script>
+  <script src="data.js?v=20261108a"></script>
+  <script src="common.js?v=20261108a"></script>
+  <script src="api.js?v=20261108a"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const code = (new URLSearchParams(location.search).get('c') || '').toUpperCase();
@@ -90,7 +90,7 @@
       showMessage('이름표의 QR을 폰 카메라로 찍어서 들어와주세요.');
     } else {
       // 판매처 카메라가 읽는 QR = 이 페이지 주소 (코드만 포함)
-      new QRCode($('qr'), { text: location.origin + location.pathname + '?c=' + code, width: 520, height: 520, correctLevel: QRCode.CorrectLevel.M });
+      new QRCode($('qr'), { text: location.origin + location.pathname + '?c=' + code, width: 520, height: 520, correctLevel: QRCode.CorrectLevel.L });
       $('refreshBtn').addEventListener('click', refresh);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
       refresh();

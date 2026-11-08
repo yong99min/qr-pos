@@ -512,16 +512,18 @@ async function startCamera() {
     });
   }
   const config = { fps: 12 };
+  // 기본 640×480으로는 이름표 QR(주소가 길어 촘촘함)을 잘 못 읽어서 해상도를 올림
+  const hd = { width: { ideal: 1280 }, height: { ideal: 720 } };
 
   try {
-    await scanner.start({ facingMode: facing }, config, onScan, () => {});
+    await scanner.start({ facingMode: facing }, { ...config, videoConstraints: { facingMode: facing, ...hd } }, onScan, () => {});
   } catch (err) {
     if (isPermissionError(err)) return showPermissionDenied();
     // facingMode 미지원 카메라면 첫 번째 카메라로 재시도
     try {
       const cams = await Html5Qrcode.getCameras();
       if (!cams.length) throw new Error('NoCamera');
-      await scanner.start(cams[0].id, config, onScan, () => {});
+      await scanner.start(cams[0].id, { ...config, videoConstraints: { deviceId: { exact: cams[0].id }, ...hd } }, onScan, () => {});
     } catch (err2) {
       if (isPermissionError(err2)) return showPermissionDenied();
       console.error(err2);

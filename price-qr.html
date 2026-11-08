@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QR 인쇄 · QR 계산대</title>
-  <link rel="stylesheet" href="style.css?v=20261102b">
+  <link rel="stylesheet" href="style.css?v=20261108a">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     /* A4 - 여백 8mm → 194×281mm, 4열×5행 = 한 장 20개 */
@@ -89,7 +89,7 @@
         <h2 style="margin-top:0">🎁 물품 <small style="color:var(--muted);font-weight:600">(data.js 목록 · QR에 상품명+가격 표시)</small></h2>
         <table class="list"><tbody id="goodsRows"></tbody></table>
         <div class="toolbar" style="margin-bottom:0">
-          <button class="btn small" id="allPageBtn">전부 10개씩</button>
+          <button class="btn small" id="allPageBtn">예상 판매 수량대로</button>
           <button class="btn small" id="allZeroBtn">전부 0개</button>
         </div>
       </div>
@@ -118,18 +118,21 @@
 
   <div id="sheets"></div>
 
-  <script src="data.js?v=20261102b"></script>
-  <script src="common.js?v=20261102b"></script>
+  <script src="data.js?v=20261108a"></script>
+  <script src="common.js?v=20261108a"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const STORE = 'pos_print_counts';
     const saved = load(STORE, {});
     let layout = saved.layout === 'big' ? 'big' : 'sticker';
     const perPage = () => (layout === 'big' ? 20 : 100);
-    let goodsQty = saved.goods || {};         // { 상품id: 개수 }
+    // 물품 목록이 바뀌면 data.js의 qty(예상 판매 수량)로 다시 시작
+    const LIST_SIG = GOODS.map((g) => g.id + g.name).join('|');
+    const defaultQty = () => Object.fromEntries(GOODS.map((g) => [g.id, g.qty || 0]));
+    let goodsQty = saved.list === LIST_SIG && saved.goods ? saved.goods : defaultQty(); // { 상품id: 개수 }
     let extras = saved.extras || [];          // [{ price, qty }]
 
-    function persist() { save(STORE, { goods: goodsQty, extras, layout }); }
+    function persist() { save(STORE, { list: LIST_SIG, goods: goodsQty, extras, layout }); }
 
     function qtyCtrl(attr, qty) {
       return `<div class="qty-ctrl" ${attr}>
@@ -205,7 +208,7 @@
       } else if (btn.id === 'addExtraBtn') {
         extras.push({ price: 0, qty: 10 });
       } else if (btn.id === 'allPageBtn') {
-        GOODS.forEach((g) => { goodsQty[g.id] = 10; });
+        goodsQty = defaultQty();
       } else if (btn.id === 'allZeroBtn') {
         goodsQty = {};
       } else if (btn.id === 'printBtn') {
