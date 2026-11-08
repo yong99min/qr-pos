@@ -272,6 +272,12 @@ function keypadPress(k) {
   setKeypad(keypadValue + k);
 }
 $('keypadOpenBtn').addEventListener('click', () => openKeypad());
+$('bagBtn').addEventListener('click', () => {
+  const bag = GOODS.find((g) => g.id === BAG_ID);
+  if (!bag) return;
+  addToCart(bag.id, bag.name, bag.price); // QR로 찍은 것과 같은 항목으로 합쳐짐
+  beep(true);
+});
 $('keypadModal').addEventListener('click', (e) => {
   if (e.target.id === 'keypadModal') return closeKeypad();
   const k = e.target.closest('[data-k]');
@@ -295,6 +301,9 @@ function renderMode() {
   document.body.classList.toggle('food-mode', food);
   $('foodGrid').classList.toggle('hidden', !food);
   $('keypadOpenBtn').classList.toggle('hidden', food);
+  const bag = GOODS.find((g) => g.id === BAG_ID);
+  $('bagBtn').classList.toggle('hidden', food || !bag);
+  if (bag) $('bagBtn').textContent = `🛍 ${bag.name} +${won(bag.price)}`;
   $('scanHint').textContent = food ? '손님 QR을 비춰주세요' : 'QR 코드를 네모 안에 비춰주세요';
   document.querySelectorAll('#modeSwitch button').forEach((b) => b.classList.toggle('active', b.dataset.mode === settings.mode));
   $('foodGrid').innerHTML = settings.foods.map((f, i) => `

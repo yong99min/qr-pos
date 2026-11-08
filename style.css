@@ -118,6 +118,17 @@ a { color: var(--primary); }
   color: var(--text);
   z-index: 5;
 }
+.bag-btn {
+  position: absolute;
+  top: 66px;
+  left: 12px;
+  padding: 10px 16px;
+  font-size: 18px;
+  font-weight: 800;
+  background: #fde047;
+  color: var(--text);
+  z-index: 5;
+}
 .keypad-box { max-width: 380px; }
 .keypad-display {
   margin-bottom: 14px;
