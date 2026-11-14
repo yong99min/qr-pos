@@ -91,4 +91,12 @@ const GOODS = [
   { id: 'G061', name: '하몽칩', price: 40, qty: 10 },
   { id: 'G062', name: '차카니', price: 20, qty: 30 },
   { id: 'G063', name: '아폴로', price: 20, qty: 20 },
+  { id: 'G064', name: '헬로키티인형', price: 50, qty: 1 },
+  { id: 'G065', name: '인생네컷앨범', price: 20, qty: 2 },
+  { id: 'G066', name: '패턴담요', price: 20, qty: 1 },
+  { id: 'G067', name: '패턴담요', price: 30, qty: 1 },
+  { id: 'G068', name: '짱구수납함', price: 20, qty: 2 },
+  { id: 'G069', name: '파우치노트', price: 30, qty: 2 },
+  { id: 'G070', name: '주간플래너', price: 20, qty: 1 },
+  { id: 'G071', name: '충전케이블', price: 20, qty: 3 },
 ];
