@@ -99,5 +99,5 @@ const GOODS = [
   { id: 'G069', name: '파우치노트', price: 30, qty: 2 },
   { id: 'G070', name: '주간플래너', price: 20, qty: 1 },
   { id: 'G071', name: '충전케이블', price: 20, qty: 3 },
-  { id: 'G071', name: '수면양말', price: 80, qty: 2 },
+  { id: 'G072', name: '수면양말', price: 80, qty: 2 },
 ];
